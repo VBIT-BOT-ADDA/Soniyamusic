@@ -429,13 +429,6 @@ class Inline:
                         style=enums.ButtonStyle.PRIMARY,
                     ),
                 ],
-                [
-                    self.ikb(
-                        text=lang["source"],
-                        url="https://github.com/AnonymousX1025/AnonXMusic",
-                        style=enums.ButtonStyle.DEFAULT,
-                    )
-                ],
             ]
         else:
             rows = [
