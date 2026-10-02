@@ -84,8 +84,13 @@ class YouTube:
             return None
         if results and results["result"]:
             data = results["result"][0]
-            return Track(
-                id=data.get("id"),
+            track_id = data.get("id")
+            ext = "mp4" if video else "webm"
+            fname = f"downloads/{track_id}.{ext}"
+            file_path = fname if Path(fname).exists() and Path(fname).stat().st_size > 1024 else None
+
+            track = Track(
+                id=track_id,
                 channel_name=data.get("channel", {}).get("name"),
                 duration=data.get("duration"),
                 duration_sec=utils.to_seconds(data.get("duration")),
@@ -96,6 +101,9 @@ class YouTube:
                 view_count=data.get("viewCount", {}).get("short"),
                 video=video,
             )
+            if file_path:
+                track.file_path = file_path
+            return track
         return None
 
     async def playlist(self, limit: int, user: str, url: str, video: bool) -> list[Track | None]:
@@ -103,8 +111,12 @@ class YouTube:
         try:
             plist = await Playlist.get(url)
             for data in plist["videos"][:limit]:
+                track_id = data.get("id")
+                ext = "mp4" if video else "webm"
+                fname = f"downloads/{track_id}.{ext}"
+                file_path = fname if Path(fname).exists() and Path(fname).stat().st_size > 1024 else None
                 track = Track(
-                    id=data.get("id"),
+                    id=track_id,
                     channel_name=data.get("channel", {}).get("name", ""),
                     duration=data.get("duration"),
                     duration_sec=utils.to_seconds(data.get("duration")),
@@ -115,6 +127,8 @@ class YouTube:
                     view_count="",
                     video=video,
                 )
+                if file_path:
+                    track.file_path = file_path
                 tracks.append(track)
         except Exception:
             pass
@@ -125,7 +139,7 @@ class YouTube:
         ext = "mp4" if video else "webm"
         filename = f"downloads/{video_id}.{ext}"
 
-        if Path(filename).exists():
+        if Path(filename).exists() and Path(filename).stat().st_size > 1024:
             return filename
 
         cookie = self.get_cookies()

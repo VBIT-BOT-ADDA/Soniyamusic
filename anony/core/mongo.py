@@ -44,6 +44,8 @@ class MongoDB:
         self.users = []
         self.usersdb = self.db.users
 
+        self.songsdb = self.db.songs
+
     async def connect(self) -> None:
         """Check if we can connect to the database.
 
@@ -367,3 +369,26 @@ class MongoDB:
         await self.get_blacklisted(True)
         await self.get_logger()
         logger.info("Database cache loaded.")
+
+    async def save_song(self, song_data: dict) -> None:
+        """Save downloaded song metadata to database."""
+        if not song_data or not song_data.get("id"):
+            return
+        video_id = song_data["id"]
+        try:
+            await self.songsdb.update_one(
+                {"_id": video_id},
+                {"$set": song_data},
+                upsert=True,
+            )
+        except Exception as e:
+            logger.warning(f"Failed to save song to DB: {e}")
+
+    async def get_song(self, video_id: str) -> dict | None:
+        """Fetch downloaded song metadata from database."""
+        if not video_id:
+            return None
+        try:
+            return await self.songsdb.find_one({"_id": video_id})
+        except Exception:
+            return None

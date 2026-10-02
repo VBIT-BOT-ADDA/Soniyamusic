@@ -107,8 +107,11 @@ async def play_hndlr(
                     m.chat.id, file.id, m.lang["play_now"]
                 ),
             )
+            anon.queue_download(file)
             if tracks:
                 added = playlist_to_queue(m.chat.id, tracks)
+                for trk in tracks:
+                    anon.queue_download(trk)
                 await app.send_message(
                     chat_id=m.chat.id,
                     text=m.lang["playlist_queued"].format(len(tracks)) + added,
@@ -117,7 +120,7 @@ async def play_hndlr(
 
     if not file.file_path:
         fname = f"downloads/{file.id}.{'mp4' if video else 'webm'}"
-        if Path(fname).exists():
+        if Path(fname).exists() and Path(fname).stat().st_size > 1024:
             file.file_path = fname
         else:
             if m.lang.get("play_downloading") != m.lang.get("play_searching"):
@@ -125,12 +128,14 @@ async def play_hndlr(
                     await sent.edit_text(m.lang["play_downloading"])
                 except Exception:
                     pass
-            file.file_path = await yt.download(file.id, video=video)
+            file.file_path = await anon.download_track(file)
 
     await anon.play_media(chat_id=m.chat.id, message=sent, media=file)
     if not tracks:
         return
     added = playlist_to_queue(m.chat.id, tracks)
+    for trk in tracks:
+        anon.queue_download(trk)
     await app.send_message(
         chat_id=m.chat.id,
         text=m.lang["playlist_queued"].format(len(tracks)) + added,
