@@ -44,6 +44,12 @@ class Language:
         for lang_code, lang_file in lang_files.items():
             with open(lang_file, "r", encoding="utf-8") as file:
                 languages[lang_code] = json.load(file)
+        en_dict = languages.get("en", {})
+        for code, l_dict in languages.items():
+            if code != "en":
+                for k, v in en_dict.items():
+                    if k not in l_dict:
+                        l_dict[k] = v
         logger.info(f"Loaded languages: {', '.join(languages.keys())}")
         return languages
 

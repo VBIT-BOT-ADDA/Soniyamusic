@@ -45,6 +45,8 @@ class MongoDB:
         self.usersdb = self.db.users
 
         self.songsdb = self.db.songs
+        self.autoplay = {}
+        self.autoplaydb = self.db.autoplay
 
     async def connect(self) -> None:
         """Check if we can connect to the database.
@@ -92,6 +94,23 @@ class MongoDB:
 
     async def set_loop(self, chat_id: int, count: int) -> None:
         self.loop[chat_id] = count
+
+    async def is_autoplay(self, chat_id: int) -> bool:
+        if chat_id not in self.autoplay:
+            doc = await self.autoplaydb.find_one({"_id": chat_id})
+            if doc is not None:
+                self.autoplay[chat_id] = doc.get("status", True)
+            else:
+                self.autoplay[chat_id] = config.AUTOPLAY
+        return self.autoplay[chat_id]
+
+    async def set_autoplay(self, chat_id: int, status: bool) -> None:
+        self.autoplay[chat_id] = status
+        await self.autoplaydb.update_one(
+            {"_id": chat_id},
+            {"$set": {"status": status}},
+            upsert=True,
+        )
 
     # AUTH METHODS
     async def _get_auth(self, chat_id: int) -> set[int]:

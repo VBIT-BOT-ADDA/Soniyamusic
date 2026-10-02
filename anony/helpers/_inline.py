@@ -138,6 +138,26 @@ class Inline:
             )
         return self.ikm(keyboard)
 
+    def autoplay_markup(self, chat_id: int, status: bool) -> types.InlineKeyboardMarkup:
+        btn_text = "˹ᴛᴜʀɴ ᴏғғ˼" if status else "˹ᴛᴜʀɴ ᴏɴ˼"
+        act = "disable" if status else "enable"
+        return self.ikm(
+            [
+                [
+                    self.ikb(
+                        text=btn_text,
+                        callback_data=f"autoplay_toggle {chat_id} {act}",
+                        style=enums.ButtonStyle.DANGER if status else enums.ButtonStyle.SUCCESS,
+                    ),
+                    self.ikb(
+                        text="˹ᴄʟᴏsᴇ˼",
+                        callback_data="help close",
+                        style=enums.ButtonStyle.DANGER,
+                    ),
+                ]
+            ]
+        )
+
     def help_markup(
         self, _lang: dict, back: bool = False
     ) -> types.InlineKeyboardMarkup:

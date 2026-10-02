@@ -134,6 +134,163 @@ class YouTube:
             pass
         return tracks
 
+    async def get_related(
+        self, video_id: str, title: str = "", video: bool = False, limit: int = 15
+    ) -> list[Track]:
+        tracks: list[Track] = []
+        if not video_id and not title:
+            return tracks
+
+        # Strategy 1: YouTube Innertube /youtubei/v1/next endpoint
+        if video_id:
+            try:
+                headers = {
+                    "User-Agent": (
+                        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                        "AppleWebKit/537.36 (KHTML, like Gecko) "
+                        "Chrome/120.0.0.0 Safari/537.36"
+                    ),
+                    "Accept-Language": "en-US,en;q=0.9",
+                }
+                payload = {
+                    "context": {
+                        "client": {
+                            "clientName": "WEB",
+                            "clientVersion": "2.20240101.00.00",
+                            "hl": "en",
+                            "gl": "IN",
+                        }
+                    },
+                    "videoId": video_id,
+                }
+                async with aiohttp.ClientSession() as session:
+                    async with session.post(
+                        "https://www.youtube.com/youtubei/v1/next",
+                        json=payload,
+                        headers=headers,
+                        timeout=aiohttp.ClientTimeout(total=8),
+                    ) as resp:
+                        if resp.status == 200:
+                            data = await resp.json()
+                            results = (
+                                data.get("contents", {})
+                                .get("twoColumnWatchNextResults", {})
+                                .get("secondaryResults", {})
+                                .get("secondaryResults", {})
+                                .get("results", [])
+                            )
+                            for item in results:
+                                cid = None
+                                t_title = None
+                                dur = "0:00"
+                                channel = ""
+                                thumb_url = None
+
+                                if "lockupViewModel" in item:
+                                    vm = item["lockupViewModel"]
+                                    cid = vm.get("contentId")
+                                    meta = vm.get("metadata", {}).get("lockupMetadataViewModel", {})
+                                    t_title = meta.get("title", {}).get("content")
+                                    rows = meta.get("metadata", {}).get("contentMetadataViewModel", {}).get("metadataRows", [])
+                                    if rows and rows[0].get("metadataParts"):
+                                        channel = rows[0]["metadataParts"][0].get("text", {}).get("content", "")
+                                    for o in vm.get("contentImage", {}).get("thumbnailViewModel", {}).get("overlays", []):
+                                        badges = o.get("thumbnailBottomOverlayViewModel", {}).get("badges", [])
+                                        for b in badges:
+                                            t = b.get("thumbnailBadgeViewModel", {}).get("text")
+                                            if t:
+                                                dur = t
+                                                break
+                                        if dur != "0:00":
+                                            break
+                                    thumb_url = f"https://i.ytimg.com/vi/{cid}/hqdefault.jpg"
+
+                                elif "compactVideoRenderer" in item:
+                                    cvr = item["compactVideoRenderer"]
+                                    cid = cvr.get("videoId")
+                                    title_dict = cvr.get("title", {})
+                                    t_title = title_dict.get("simpleText") or (
+                                        title_dict.get("runs", [{}])[0].get("text") if title_dict.get("runs") else ""
+                                    )
+                                    dur = cvr.get("lengthText", {}).get("simpleText", "0:00")
+                                    channel = cvr.get("shortBylineText", {}).get("runs", [{}])[0].get("text", "")
+                                    thumb_url = f"https://i.ytimg.com/vi/{cid}/hqdefault.jpg"
+
+                                if cid and t_title and cid != video_id and len(cid) == 11 and not cid.startswith(("RD", "PL")):
+                                    try:
+                                        dur_sec = utils.to_seconds(dur)
+                                    except Exception:
+                                        dur_sec = 0
+                                    if dur_sec < 10:
+                                        continue
+                                    ext = "mp4" if video else "webm"
+                                    fname = f"downloads/{cid}.{ext}"
+                                    file_path = (
+                                        fname
+                                        if Path(fname).exists() and Path(fname).stat().st_size > 1024
+                                        else None
+                                    )
+                                    trk = Track(
+                                        id=cid,
+                                        channel_name=channel,
+                                        duration=dur,
+                                        duration_sec=dur_sec,
+                                        title=t_title[:25],
+                                        thumbnail=thumb_url,
+                                        url=f"https://www.youtube.com/watch?v={cid}",
+                                        user="˹ᴧᴜᴛᴏᴘʟᴧʏ˼ 📻",
+                                        video=video,
+                                        file_path=file_path,
+                                    )
+                                    tracks.append(trk)
+                                    if len(tracks) >= limit:
+                                        break
+            except Exception as e:
+                logger.warning(f"Innertube related error: {e}")
+
+        # Strategy 2: VideosSearch fallback
+        if not tracks and title:
+            try:
+                query = f"{title} song"
+                _search = VideosSearch(query, limit=limit, with_live=False)
+                res = await _search.next()
+                if res and res.get("result"):
+                    for data in res["result"]:
+                        cid = data.get("id")
+                        if not cid or cid == video_id:
+                            continue
+                        dur = data.get("duration", "0:00")
+                        try:
+                            dur_sec = utils.to_seconds(dur)
+                        except Exception:
+                            dur_sec = 0
+                        ext = "mp4" if video else "webm"
+                        fname = f"downloads/{cid}.{ext}"
+                        file_path = (
+                            fname
+                            if Path(fname).exists() and Path(fname).stat().st_size > 1024
+                            else None
+                        )
+                        trk = Track(
+                            id=cid,
+                            channel_name=data.get("channel", {}).get("name", ""),
+                            duration=dur,
+                            duration_sec=dur_sec,
+                            title=data.get("title", "")[:25],
+                            thumbnail=data.get("thumbnails", [{}])[-1].get("url", "").split("?")[0],
+                            url=data.get("link"),
+                            user="˹ᴧᴜᴛᴏᴘʟᴧʏ˼ 📻",
+                            video=video,
+                            file_path=file_path,
+                        )
+                        tracks.append(trk)
+                        if len(tracks) >= limit:
+                            break
+            except Exception as e:
+                logger.warning(f"VideosSearch related fallback error: {e}")
+
+        return tracks
+
     async def download(self, video_id: str, video: bool = False) -> str | None:
         url = self.base + video_id
         ext = "mp4" if video else "webm"

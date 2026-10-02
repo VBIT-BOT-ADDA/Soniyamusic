@@ -26,6 +26,8 @@ class TgCall(PyTgCalls):
         self._dl_queue = asyncio.Queue()
         self._dl_tasks = []
         self._downloading = set()
+        self.last_track = {}
+        self.played_tracks = {}
 
     async def _dl_worker(self):
         while True:
@@ -117,6 +119,8 @@ class TgCall(PyTgCalls):
         queue.clear(chat_id)
         await db.remove_call(chat_id)
         await db.set_loop(chat_id, 0)
+        self.last_track.pop(chat_id, None)
+        self.played_tracks.pop(chat_id, None)
 
         try:
             await client.leave_call(chat_id, close=False)
@@ -164,6 +168,14 @@ class TgCall(PyTgCalls):
             if not seek_time:
                 media.time = 1
                 await db.add_call(chat_id)
+                self.last_track[chat_id] = media
+                if getattr(media, "id", None):
+                    if chat_id not in self.played_tracks:
+                        self.played_tracks[chat_id] = []
+                    if media.id not in self.played_tracks[chat_id]:
+                        self.played_tracks[chat_id].append(media.id)
+                    if len(self.played_tracks[chat_id]) > 50:
+                        self.played_tracks[chat_id].pop(0)
                 title = f"<a href='{media.url}'>{media.title}</a>" if media.url else media.title
                 text = (
                     f"<blockquote><b>❖  𝛅ᴛᴧʀᴛєᴅ  𝛅ᴛʀєᴧϻɪηɢ</b></blockquote>\n"
@@ -234,6 +246,8 @@ class TgCall(PyTgCalls):
 
         media = queue.get_next(chat_id)
         if not media:
+            if await self.handle_autoplay(chat_id):
+                return
             return await self.stop(chat_id)
 
         try:
@@ -276,6 +290,85 @@ class TgCall(PyTgCalls):
                 )
             media.message_id = msg.id
             await self.play_media(chat_id, msg, media)
+
+
+    async def handle_autoplay(self, chat_id: int) -> bool:
+        if not await db.is_autoplay(chat_id):
+            return False
+
+        last_media = self.last_track.get(chat_id)
+        if not last_media or not getattr(last_media, "id", None):
+            return False
+
+        _lang = await lang.get_lang(chat_id)
+        video_id = last_media.id
+        title = getattr(last_media, "title", "")
+        video = getattr(last_media, "video", False)
+
+        candidates = await yt.get_related(video_id=video_id, title=title, video=video)
+        if not candidates:
+            return False
+
+        played = set(self.played_tracks.get(chat_id, []))
+        chosen = None
+        for cand in candidates:
+            if cand.id not in played:
+                chosen = cand
+                break
+
+        if not chosen:
+            for cand in candidates:
+                if cand.id != video_id:
+                    chosen = cand
+                    break
+            if not chosen:
+                chosen = candidates[0]
+
+        chosen.user = "˹ᴧᴜᴛᴏᴘʟᴧʏ˼ 📻"
+        chosen.video = video
+
+        queue.add(chat_id, chosen)
+        if chat_id not in self.played_tracks:
+            self.played_tracks[chat_id] = []
+        if chosen.id not in self.played_tracks[chat_id]:
+            self.played_tracks[chat_id].append(chosen.id)
+
+        ext = "mp4" if video else "webm"
+        fname = f"downloads/{chosen.id}.{ext}"
+        if Path(fname).exists() and Path(fname).stat().st_size > 1024:
+            chosen.file_path = fname
+
+        # Proactively queue background download for the next recommendation
+        for next_cand in candidates:
+            if next_cand.id != chosen.id and next_cand.id not in played:
+                self.queue_download(next_cand)
+                break
+
+        # Delete previous track message if present
+        if last_media and getattr(last_media, "message_id", None):
+            try:
+                await app.delete_messages(
+                    chat_id=chat_id,
+                    message_ids=last_media.message_id,
+                    revoke=True,
+                )
+            except Exception:
+                pass
+
+        if chosen.file_path:
+            sent = await app.send_message(chat_id=chat_id, text=_lang["processing"])
+            chosen.message_id = sent.id
+            await self.play_media(chat_id, sent, chosen)
+        else:
+            msg = await app.send_message(chat_id=chat_id, text=_lang["processing"])
+            chosen.file_path = await self.download_track(chosen)
+            if not chosen.file_path:
+                queue.remove_current(chat_id)
+                return await self.handle_autoplay(chat_id)
+            chosen.message_id = msg.id
+            await self.play_media(chat_id, msg, chosen)
+
+        return True
 
 
     async def ping(self) -> float:
