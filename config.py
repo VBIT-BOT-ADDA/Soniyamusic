@@ -47,6 +47,8 @@ class Config:
             else "https://files.catbox.moe/haagg2.png",
         )
         self.START_IMG = getenv("START_IMG", "https://files.catbox.moe/zvziwk.jpg")
+        self.ARC_API_URL = getenv("ARC_API_URL", "https://api.arcmusic.fun")
+        self.ARC_API_KEY = getenv("ARC_API_KEY", "ARC5c354b8ef8b2b1ef5d9e8b")
 
     def check(self):
         missing = [

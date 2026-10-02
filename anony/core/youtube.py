@@ -13,7 +13,7 @@ from pathlib import Path
 
 from py_yt import Playlist, VideosSearch
 
-from anony import logger
+from anony import config, logger
 from anony.helpers import Track, utils
 
 
@@ -76,7 +76,65 @@ class YouTube:
     def invalid(self, url: str) -> bool:
         return bool(re.match(self.iregex, url))
 
+    async def _arc_search(self, query: str, m_id: int, video: bool = False) -> Track | None:
+        if not getattr(config, "ARC_API_KEY", None):
+            return None
+        try:
+            timeout = aiohttp.ClientTimeout(total=8)
+            api_url = f"{config.ARC_API_URL.rstrip('/')}/youtube/v2/search"
+            params = {
+                "query": query,
+                "limit": 1,
+                "api_key": config.ARC_API_KEY,
+            }
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                async with session.get(api_url, params=params) as resp:
+                    if resp.status == 200:
+                        data = await resp.json()
+                        results = data.get("results")
+                        if results and isinstance(results, list) and len(results) > 0:
+                            first = results[0]
+                            track_id = first.get("video_id")
+                            if not track_id:
+                                return None
+
+                            dur = first.get("duration", "0:00")
+                            try:
+                                dur_sec = utils.to_seconds(dur)
+                            except Exception:
+                                dur_sec = 0
+
+                            file_path = None
+                            for c_ext in (["mp4"] if video else ["webm", "mp3", "m4a"]):
+                                fn = f"downloads/{track_id}.{c_ext}"
+                                if Path(fn).exists() and Path(fn).stat().st_size > 1024:
+                                    file_path = fn
+                                    break
+
+                            track = Track(
+                                id=track_id,
+                                channel_name=first.get("channel", ""),
+                                duration=dur,
+                                duration_sec=dur_sec,
+                                message_id=m_id,
+                                title=first.get("title", "")[:25],
+                                thumbnail=first.get("thumbnail", ""),
+                                url=first.get("url") or f"https://www.youtube.com/watch?v={track_id}",
+                                view_count=first.get("views", ""),
+                                video=video,
+                            )
+                            if file_path:
+                                track.file_path = file_path
+                            return track
+        except Exception as e:
+            logger.warning(f"Arc API search error: {e}")
+        return None
+
     async def search(self, query: str, m_id: int, video: bool = False) -> Track | None:
+        arc_track = await self._arc_search(query, m_id, video=video)
+        if arc_track:
+            return arc_track
+
         try:
             _search = VideosSearch(query, limit=1, with_live=False)
             results = await _search.next()
@@ -291,13 +349,128 @@ class YouTube:
 
         return tracks
 
+    async def _arc_download(self, video_id: str, video: bool = False) -> str | None:
+        if not getattr(config, "ARC_API_KEY", None):
+            return None
+
+        # Check existing downloads first
+        for c_ext in (["mp4"] if video else ["webm", "mp3", "m4a"]):
+            fn = f"downloads/{video_id}.{c_ext}"
+            if Path(fn).exists() and Path(fn).stat().st_size > 1024:
+                return fn
+
+        try:
+            api_url = f"{config.ARC_API_URL.rstrip('/')}/youtube/v2/download"
+            params = {
+                "query": video_id,
+                "isVideo": "true" if video else "false",
+                "api_key": config.ARC_API_KEY,
+            }
+            cdn = None
+            timeout = aiohttp.ClientTimeout(total=25)
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                async with session.get(api_url, params=params) as resp:
+                    if resp.status == 200:
+                        data = await resp.json()
+                        if data.get("status") == "success" and data.get("result"):
+                            cdn = data["result"].get("cdn")
+                        elif data.get("status") == "queued" and data.get("job_id"):
+                            job_id = data["job_id"]
+                            status_url = f"{config.ARC_API_URL.rstrip('/')}/youtube/jobStatus"
+                            for _ in range(12):
+                                await asyncio.sleep(2)
+                                async with session.get(status_url, params={"job_id": job_id}) as sresp:
+                                    if sresp.status == 200:
+                                        sdata = await sresp.json()
+                                        job = sdata.get("job", {})
+                                        if job.get("status") == "done":
+                                            res = job.get("result", {})
+                                            if res.get("success") and res.get("cdn"):
+                                                cdn = res["cdn"]
+                                            break
+                                        elif job.get("status") == "failed":
+                                            break
+
+            if not cdn:
+                return None
+
+            target_ext = "mp4" if video else "mp3"
+            target_file = f"downloads/{video_id}.{target_ext}"
+
+            # Case 1: Telegram media link (e.g. https://t.me/ArcAPI_1/108)
+            if "t.me/" in cdn:
+                parts = cdn.rstrip("/").split("/")
+                chat = parts[-2]
+                msg_id = int(parts[-1])
+
+                from anony import app, userbot
+                msg = None
+                client_to_use = None
+
+                # Try userbot first if connected
+                for ub in getattr(userbot, "clients", []):
+                    if getattr(ub, "is_connected", False):
+                        try:
+                            msg = await ub.get_messages(chat, msg_id)
+                            if msg and (msg.audio or msg.video or msg.document):
+                                client_to_use = ub
+                                break
+                        except Exception:
+                            continue
+
+                # Fallback to app
+                if not msg and getattr(app, "is_connected", False):
+                    try:
+                        msg = await app.get_messages(chat, msg_id)
+                        if msg and (msg.audio or msg.video or msg.document):
+                            client_to_use = app
+                    except Exception:
+                        pass
+
+                if msg and client_to_use:
+                    saved_path = await client_to_use.download_media(msg, file_name=target_file)
+                    if saved_path and os.path.exists(saved_path) and os.path.getsize(saved_path) > 1024:
+                        return saved_path
+
+            # Case 2: Direct HTTP streaming CDN link
+            elif cdn.startswith("http"):
+                dl_timeout = aiohttp.ClientTimeout(
+                    connect=10,
+                    sock_read=60,
+                    total=360,
+                )
+                async with aiohttp.ClientSession(timeout=dl_timeout) as dl_session:
+                    async with dl_session.get(cdn) as dl_resp:
+                        if dl_resp.status == 200:
+                            with open(target_file, "wb") as f:
+                                async for chunk in dl_resp.content.iter_chunked(1024 * 1024):
+                                    f.write(chunk)
+                            if os.path.exists(target_file) and os.path.getsize(target_file) > 1024:
+                                return target_file
+
+        except Exception as e:
+            logger.warning(f"Arc API download error for {video_id}: {e}")
+
+        return None
+
     async def download(self, video_id: str, video: bool = False) -> str | None:
+        # Check cache first
+        for c_ext in (["mp4"] if video else ["webm", "mp3", "m4a"]):
+            fn = f"downloads/{video_id}.{c_ext}"
+            if Path(fn).exists() and Path(fn).stat().st_size > 1024:
+                return fn
+
+        # Try Arc API first
+        if getattr(config, "ARC_API_KEY", None):
+            arc_file = await self._arc_download(video_id, video)
+            if arc_file:
+                return arc_file
+
+        # Fallback to direct yt-dlp
+        logger.info(f"Using yt-dlp fallback download for {video_id}")
         url = self.base + video_id
         ext = "mp4" if video else "webm"
         filename = f"downloads/{video_id}.{ext}"
-
-        if Path(filename).exists() and Path(filename).stat().st_size > 1024:
-            return filename
 
         cookie = self.get_cookies()
         base_opts = {
