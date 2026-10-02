@@ -4,6 +4,7 @@
 
 
 import re
+import time
 
 from pyrogram import errors, filters, types
 
@@ -56,6 +57,10 @@ async def _controls(_, query: types.CallbackQuery):
             )
         await anon.pause(chat_id)
         if qaction:
+            if args[3] == "queued":
+                return await query.answer(
+                    query.lang["play_paused"].format(user)
+                )
             return await query.edit_message_reply_markup(
                 reply_markup=buttons.queue_markup(chat_id, query.lang["paused"], False)
             )
@@ -67,6 +72,10 @@ async def _controls(_, query: types.CallbackQuery):
             return await query.answer(query.lang["play_not_paused"], show_alert=True)
         await anon.resume(chat_id)
         if qaction:
+            if args[3] == "queued":
+                return await query.answer(
+                    query.lang["play_resumed"].format(user)
+                )
             return await query.edit_message_reply_markup(
                 reply_markup=buttons.queue_markup(chat_id, query.lang["playing"], True)
             )
@@ -127,6 +136,84 @@ async def _controls(_, query: types.CallbackQuery):
         await query.edit_message_text(
             f"{mtext}\n\n<blockquote>{reply}</blockquote>", reply_markup=keyboard
         )
+    except Exception:
+        pass
+
+
+@app.on_callback_query(filters.regex(r"^queue_(list|back)") & ~app.bl_users)
+@lang.language()
+async def _queue_callbacks(_, query: types.CallbackQuery):
+    data_parts = query.data.split()
+    action = data_parts[0].split("_")[1]
+    chat_id = int(data_parts[1])
+
+    if not await db.get_call(chat_id):
+        return await query.answer(query.lang["not_playing"], show_alert=True)
+
+    _queue = queue.get_queue(chat_id)
+    if not _queue:
+        return await query.answer(query.lang["not_playing"], show_alert=True)
+
+    _media = _queue[0]
+    bot_mention = app.me.mention if hasattr(app, "me") and app.me else "Bot"
+    stream_type = "Video" if getattr(_media, "video", False) else "Audio"
+    title = f"<a href='{_media.url}'>{_media.title}</a>" if _media.url else _media.title
+    user = _media.user or "Unknown"
+
+    if action == "list":
+        queue_items = _queue[1:]
+        cur_title = f"<a href='{_media.url}'>{_media.title}</a>" if _media.url else _media.title
+        cur_duration = _media.duration or "0:00"
+        cur_user = _media.user or "Unknown"
+
+        text = (
+            "Streaming :\n\n"
+            f"✨ Title : {cur_title}\n"
+            f"Duration : {cur_duration}\n"
+            f"By : {cur_user}\n\n"
+            "Queued :"
+        )
+        if queue_items:
+            for item in queue_items[:10]:
+                i_title = f"<a href='{item.url}'>{item.title}</a>" if item.url else item.title
+                i_duration = item.duration or "0:00"
+                i_user = item.user or "Unknown"
+                text += (
+                    f"\n\n✨ Title : {i_title}\n"
+                    f"Duration : {i_duration}\n"
+                    f"By : {i_user}"
+                )
+        else:
+            text += "\n\nNo tracks in queue."
+
+        reply_markup = buttons.queue_list_markup(chat_id)
+    else:
+        text = (
+            f"{bot_mention} ᴘʟᴀʏᴇʀ\n\n"
+            f"🎄 sᴛʀᴇᴀᴍɪɴɢ : {title}\n\n"
+            f"🔗 sᴛʀᴇᴀᴍ ᴛʏᴘᴇ : {stream_type}\n"
+            f"🥀 ʀᴇǫᴜᴇsᴛᴇᴅ ʙʏ : {user}\n\n"
+            f"ᴄʟɪᴄᴋ ᴏɴ ʙᴜᴛᴛᴏɴ ʙᴇʟᴏᴡ ᴛᴏ ɢᴇᴛ ᴡʜᴏʟᴇ ǫᴜᴇᴜᴇᴅ ʟɪsᴛ."
+        )
+        played = _media.time or 0
+        duration = _media.duration_sec or 0
+        if duration:
+            remaining = max(duration - played, 0)
+            length = 10
+            pos = min(int((played / duration) * length), length - 1)
+            bar = "—" * pos + "◉" + "—" * (length - pos - 1)
+            slidebar = f"{time.strftime('%M:%S', time.gmtime(played))} | {bar} | -{time.strftime('%M:%S', time.gmtime(remaining))}"
+        else:
+            slidebar = "00:00 | ◉————————— | -00:00"
+        reply_markup = buttons.queue_markup(chat_id, slidebar)
+
+    try:
+        if query.message.caption:
+            if len(text) > 1020:
+                text = text[:1000] + "..."
+            await query.edit_message_caption(caption=text, reply_markup=reply_markup)
+        else:
+            await query.edit_message_text(text=text, reply_markup=reply_markup)
     except Exception:
         pass
 

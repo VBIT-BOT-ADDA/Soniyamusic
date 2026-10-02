@@ -3,9 +3,10 @@
 # This file is part of AnonXMusic
 
 import asyncio
+import time
 from pyrogram import enums, filters, types
 
-from anony import app, config, db, lang
+from anony import app, boot, config, db, lang
 from anony.helpers import buttons, utils
 
 
@@ -15,6 +16,15 @@ async def _help(_, m: types.Message):
     await m.reply_text(
         text=m.lang["help_menu"],
         reply_markup=buttons.help_markup(m.lang),
+        quote=True,
+    )
+
+
+@app.on_message(filters.command(["help"]) & filters.group & ~app.bl_users)
+async def _help_group(_, m: types.Message):
+    await m.reply_text(
+        text="<b>ᴄʟɪᴄᴋ ᴏɴ ᴛʜᴇ ʙᴜᴛᴛᴏɴ ʙᴇʟᴏᴡ ᴛᴏ ɢᴇᴛ ᴍʏ ʜᴇʟᴘ ᴍᴇɴᴜ ɪɴ ʏᴏᴜʀ ᴘᴍ.</b>",
+        reply_markup=buttons.help_group_key("Help"),
         quote=True,
     )
 
@@ -29,17 +39,54 @@ async def start(_, message: types.Message):
         return await _help(_, message)
 
     private = message.chat.type == enums.ChatType.PRIVATE
-    _text = (
-        message.lang["start_pm"].format(message.from_user.first_name, app.name)
-        if private
-        else message.lang["start_gp"].format(app.name)
-    )
+    bot_mention = app.mention
+
+    if private:
+        user_mention = (
+            message.from_user.mention
+            if message.from_user
+            else (message.author_signature or message.chat.title or "User")
+        )
+        owner_mention = getattr(app, "owner_mention", None)
+        if not owner_mention or "tg://user" in owner_mention:
+            try:
+                owner = await app.get_users(config.OWNER_ID)
+                owner_mention = owner.mention
+                app.owner_mention = owner_mention
+            except Exception:
+                owner_mention = f"<a href='tg://user?id={config.OWNER_ID}'>Owner</a>"
+
+        _text = (
+            f"<b>╭───────────────────▣\n"
+            f"│❍ ʜᴇʏ {user_mention}•\n"
+            f"│❍ ɪ ᴀᴍ {bot_mention} ♪ •\n"
+            f"├───────────────────▣\n"
+            f"│❍ ʙᴇsᴛ ǫᴜɪʟɪᴛʏ ғᴇᴀᴛᴜʀᴇs •\n"
+            f"│❍ ᴍᴀᴅᴇ ʙʏ...{owner_mention} •\n"
+            f"╰───────────────────▣</b>"
+        )
+    else:
+        uptime_sec = int(time.time() - boot)
+        days = uptime_sec // 86400
+        hours = (uptime_sec // 3600) % 24
+        minutes = (uptime_sec // 60) % 60
+        seconds = uptime_sec % 60
+        uptime = (
+            f"{days}ᴅ:{hours}ʜ:{minutes}ᴍ:{seconds}s"
+            if days > 0
+            else f"{hours}ʜ:{minutes}ᴍ:{seconds}s"
+        )
+        _text = (
+            f"<b>{bot_mention}♪ ɪs ᴀʟɪᴠᴇ ʙᴀʙʏ.\n\n"
+            f"✫ ᴜᴘᴛɪᴍᴇ : {uptime}</b>"
+        )
 
     key = buttons.start_key(message.lang, private)
     await message.reply_photo(
         photo=config.START_IMG,
         caption=_text,
         reply_markup=key,
+        has_spoiler=True,
         quote=not private,
     )
 

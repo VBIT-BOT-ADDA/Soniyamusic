@@ -1,8 +1,4 @@
-# Copyright (c) 2025 AnonymousX1025
-# Licensed under the MIT License.
-# This file is part of AnonXMusic
-
-
+import os
 import time
 import psutil
 
@@ -19,9 +15,10 @@ async def _ping(_, m: types.Message):
     get_time = lambda s: (lambda r: (f"{r[-1]}, " if r[-1][:-4] != "0" else "") + ":".join(reversed(r[:-1])))([f"{v}{u}" for v, u in zip([s%60, (s//60)%60, (s//3600)%24, s//86400], ["s", "m", "h", "days"])])
     uptime = get_time(int(time.time() - boot))
     latency = round((time.time() - start) * 1000, 2)
+    ping_img = "assets/ping.jpg" if os.path.exists("assets/ping.jpg") else config.PING_IMG
     await sent.edit_media(
         media=types.InputMediaPhoto(
-            media=config.PING_IMG,
+            media=ping_img,
             caption=m.lang["ping_pong"].format(
                 latency,
                 uptime,

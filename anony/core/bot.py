@@ -20,6 +20,7 @@ class Bot(pyrogram.Client):
             link_preview_options=pyrogram.types.LinkPreviewOptions(is_disabled=True),
         )
         self.owner = config.OWNER_ID
+        self.owner_mention = f"<a href='tg://user?id={self.owner}'>Owner</a>"
         self.logger = config.LOGGER_ID
         self.bl_users = pyrogram.filters.user()
         self.sudoers = pyrogram.filters.user(self.owner)
@@ -36,6 +37,12 @@ class Bot(pyrogram.Client):
         self.name = self.me.first_name
         self.username = self.me.username
         self.mention = self.me.mention
+
+        try:
+            owner_user = await self.get_users(self.owner)
+            self.owner_mention = owner_user.mention
+        except Exception:
+            pass
 
         try:
             await self.send_message(self.logger, "Bot Started")

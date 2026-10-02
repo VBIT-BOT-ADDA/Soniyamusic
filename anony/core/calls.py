@@ -89,11 +89,12 @@ class TgCall(PyTgCalls):
             if not seek_time:
                 media.time = 1
                 await db.add_call(chat_id)
-                text = _lang["play_media"].format(
-                    media.url,
-                    media.title,
-                    media.duration,
-                    media.user,
+                title = f"<a href='{media.url}'>{media.title}</a>" if media.url else media.title
+                text = (
+                    f"<blockquote><b>❖  𝛅ᴛᴧʀᴛєᴅ  𝛅ᴛʀєᴧϻɪηɢ</b></blockquote>\n"
+                    f"<blockquote>❍ тɪᴛʟє : {title}\n"
+                    f"❍ ᴅᴜʀᴧᴛɪση : {media.duration} ϻɪηᴜᴛєs\n"
+                    f"❍ ʙʏ : {media.user}</blockquote>"
                 )
                 keyboard = buttons.controls(chat_id)
                 try:

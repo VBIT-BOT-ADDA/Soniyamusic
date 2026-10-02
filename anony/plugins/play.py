@@ -120,7 +120,11 @@ async def play_hndlr(
         if Path(fname).exists():
             file.file_path = fname
         else:
-            await sent.edit_text(m.lang["play_downloading"])
+            if m.lang.get("play_downloading") != m.lang.get("play_searching"):
+                try:
+                    await sent.edit_text(m.lang["play_downloading"])
+                except Exception:
+                    pass
             file.file_path = await yt.download(file.id, video=video)
 
     await anon.play_media(chat_id=m.chat.id, message=sent, media=file)
