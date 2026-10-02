@@ -64,6 +64,19 @@ class Inline:
             ]
         )
 
+    def close_key(self, text: str = "Close") -> types.InlineKeyboardMarkup:
+        return self.ikm(
+            [
+                [
+                    self.ikb(
+                        text=text,
+                        callback_data="help close",
+                        style=enums.ButtonStyle.DANGER,
+                    )
+                ]
+            ]
+        )
+
     def controls(
         self,
         chat_id: int,

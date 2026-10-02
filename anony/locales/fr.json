@@ -78,7 +78,7 @@
     "play_invite": "Attendez un instant...\n\nInvitation de l'assistant {0} à votre chat.",
     "play_searching": "<b>🥀 𝐏ɤσƈɛssɩŋʛ... 🦋</b>",
     "play_downloading": "<b>🥀 𝐏ɤσƈɛssɩŋʛ... 🦋</b>",
-    "play_paused": "<b>Flux mis en pause par</b> {0}",
+    "play_paused": "<b>➻ sᴛʀᴇᴀᴍ ᴘᴀᴜsᴇᴅ 🎄\n│ \n└ʙʏ : {0} 🥀</b>",
     "play_resumed": "<b>Flux repris par</b> {0}",
     "play_replayed": "<b>Flux relu par</b> {0}",
     "play_skipped": "<b>Flux sauté par</b> {0}",
