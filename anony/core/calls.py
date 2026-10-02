@@ -28,6 +28,8 @@ class TgCall(PyTgCalls):
         self._downloading = set()
         self.last_track = {}
         self.played_tracks = {}
+        self.autoplay_active = {}
+        self.empty_prompt_msg = {}
 
     async def _dl_worker(self):
         while True:
@@ -121,6 +123,12 @@ class TgCall(PyTgCalls):
         await db.set_loop(chat_id, 0)
         self.last_track.pop(chat_id, None)
         self.played_tracks.pop(chat_id, None)
+        self.autoplay_active.pop(chat_id, None)
+        if prompt_id := self.empty_prompt_msg.pop(chat_id, None):
+            try:
+                await app.delete_messages(chat_id=chat_id, message_ids=prompt_id)
+            except Exception:
+                pass
 
         try:
             await client.leave_call(chat_id, close=False)
@@ -246,9 +254,10 @@ class TgCall(PyTgCalls):
 
         media = queue.get_next(chat_id)
         if not media:
-            if await self.handle_autoplay(chat_id):
-                return
-            return await self.stop(chat_id)
+            if self.autoplay_active.get(chat_id):
+                if await self.handle_autoplay(chat_id):
+                    return
+            return await self.send_queue_empty(chat_id)
 
         try:
             if media.message_id:
@@ -292,8 +301,41 @@ class TgCall(PyTgCalls):
             await self.play_media(chat_id, msg, media)
 
 
-    async def handle_autoplay(self, chat_id: int) -> bool:
-        if not await db.is_autoplay(chat_id):
+    async def send_queue_empty(self, chat_id: int) -> None:
+        last_media = self.last_track.get(chat_id)
+        if last_media and getattr(last_media, "message_id", None):
+            try:
+                await app.delete_messages(
+                    chat_id=chat_id,
+                    message_ids=last_media.message_id,
+                    revoke=True,
+                )
+                last_media.message_id = 0
+            except Exception:
+                pass
+
+        _lang = await lang.get_lang(chat_id)
+        text = _lang.get(
+            "autoplay_queue_empty",
+            (
+                "<blockquote><b>𝖭ᴏ 𝖬ᴏʀᴇ 𝖲ᴏɴɢs ɪɴ ᴛʜᴇ 𝖰ᴜᴇᴜᴇ\n"
+                "ᴛʜᴇ ᴘʟᴀʏʟɪsᴛ ʜᴀs ᴇɴᴅᴇᴅ — ʜɪᴛ ᴀᴜᴛᴏᴘʟᴀʏ ᴛᴏ ᴋᴇᴇᴘ ᴛʜᴇ ᴍᴜsɪᴄ ɢᴏɪɴɢ.</b></blockquote>"
+            ),
+        )
+        keyboard = buttons.autoplay_prompt_markup(chat_id)
+        try:
+            sent = await app.send_message(
+                chat_id=chat_id,
+                text=text,
+                reply_markup=keyboard,
+            )
+            self.empty_prompt_msg[chat_id] = sent.id
+        except Exception as e:
+            logger.warning(f"Failed to send queue empty message: {e}")
+
+
+    async def handle_autoplay(self, chat_id: int, force: bool = False) -> bool:
+        if not force and not await db.is_autoplay(chat_id):
             return False
 
         last_media = self.last_track.get(chat_id)
@@ -344,7 +386,7 @@ class TgCall(PyTgCalls):
                 self.queue_download(next_cand)
                 break
 
-        # Delete previous track message if present
+        # Delete previous track message or empty prompt if present
         if last_media and getattr(last_media, "message_id", None):
             try:
                 await app.delete_messages(
@@ -355,6 +397,18 @@ class TgCall(PyTgCalls):
             except Exception:
                 pass
 
+        if prompt_id := self.empty_prompt_msg.pop(chat_id, None):
+            try:
+                await app.delete_messages(
+                    chat_id=chat_id,
+                    message_ids=prompt_id,
+                    revoke=True,
+                )
+            except Exception:
+                pass
+
+        self.autoplay_active[chat_id] = True
+
         if chosen.file_path:
             sent = await app.send_message(chat_id=chat_id, text=_lang["processing"])
             chosen.message_id = sent.id
@@ -364,7 +418,7 @@ class TgCall(PyTgCalls):
             chosen.file_path = await self.download_track(chosen)
             if not chosen.file_path:
                 queue.remove_current(chat_id)
-                return await self.handle_autoplay(chat_id)
+                return await self.handle_autoplay(chat_id, force=force)
             chosen.message_id = msg.id
             await self.play_media(chat_id, msg, chosen)
 

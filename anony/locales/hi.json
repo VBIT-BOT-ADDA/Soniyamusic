@@ -67,6 +67,7 @@
     "autoplay_off": "<blockquote><b>➻ ᴧᴜᴛᴏᴘʟᴧʏ ʜᴧs ʙєєη ᴅɪsᴧʙʟєᴅ ғᴏʀ ᴛʜɪs ᴄʜᴧᴛ. 📻</b></blockquote>",
     "autoplay_enabled": "ᴇɴᴧʙʟєᴅ",
     "autoplay_disabled": "ᴅɪsᴧʙʟєᴅ",
+    "autoplay_queue_empty": "<blockquote><b>𝖭ᴏ 𝖬ᴏʀᴇ 𝖲ᴏɴɢs ɪɴ ᴛʜᴇ 𝖰ᴜᴇᴜᴇ\nᴛʜᴇ ᴘʟᴀʏʟɪsᴛ ʜᴀs ᴇɴᴅᴇᴅ — ʜɪᴛ ᴀᴜᴛᴏᴘʟᴀʏ ᴛᴏ ᴋᴇᴇᴘ ᴛʜᴇ ᴍᴜsɪᴄ ɢᴏɪɴɢ.</b></blockquote>",
     "not_playing": "बॉट वीडियो चैट में स्ट्रीमिंग नहीं कर रहा है।",
     "pinging": "पिंग कर रहा है… कृपया प्रतीक्षा करें…",
     "ping_pong": "<u><b>पोंग!</b></u>\n\n<b>विलंबता:</b> <code>{0}ms</code>\n\n<b>अपटाइम:</b> {1}\n<b>सीपीयू:</b> <code>{2}%</code>\n<b>रैम:</b> <code>{3}%</code>\n<b>डिस्क:</b> <code>{4}%</code>\n<b>PyTgCalls विलंबता:</b> <code>{5}ms</code>",

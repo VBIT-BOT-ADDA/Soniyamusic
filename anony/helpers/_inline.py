@@ -158,6 +158,24 @@ class Inline:
             ]
         )
 
+    def autoplay_prompt_markup(self, chat_id: int) -> types.InlineKeyboardMarkup:
+        return self.ikm(
+            [
+                [
+                    self.ikb(
+                        text="˹ᴧᴜᴛᴏᴘʟᴧʏ˼ 📻",
+                        callback_data=f"autoplay_start {chat_id}",
+                        style=enums.ButtonStyle.DANGER,
+                    ),
+                    self.ikb(
+                        text="˹ᴄʟᴏsᴇ˼",
+                        callback_data=f"autoplay_close {chat_id}",
+                        style=enums.ButtonStyle.DANGER,
+                    ),
+                ]
+            ]
+        )
+
     def help_markup(
         self, _lang: dict, back: bool = False
     ) -> types.InlineKeyboardMarkup:

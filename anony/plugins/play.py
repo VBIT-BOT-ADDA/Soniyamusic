@@ -88,13 +88,20 @@ async def play_hndlr(
     if await db.is_logger():
         await utils.play_log(m, sent.link, file.title, file.duration)
 
+    if prompt_id := anon.empty_prompt_msg.pop(m.chat.id, None):
+        try:
+            await app.delete_messages(chat_id=m.chat.id, message_ids=prompt_id)
+        except Exception:
+            pass
+    anon.autoplay_active[m.chat.id] = False
+
     file.user = mention
     if force:
         queue.force_add(m.chat.id, file)
     else:
         position = queue.add(m.chat.id, file)
 
-        if position != 0 or await db.get_call(m.chat.id):
+        if position != 0:
             await sent.edit_text(
                 m.lang["play_queued"].format(
                     position,

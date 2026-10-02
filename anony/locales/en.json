@@ -67,6 +67,7 @@
     "autoplay_off": "<blockquote><b>➻ ᴧᴜᴛᴏᴘʟᴧʏ ʜᴧs ʙєєη ᴅɪsᴧʙʟєᴅ ғᴏʀ ᴛʜɪs ᴄʜᴧᴛ. 📻</b></blockquote>",
     "autoplay_enabled": "ᴇɴᴧʙʟєᴅ",
     "autoplay_disabled": "ᴅɪsᴧʙʟєᴅ",
+    "autoplay_queue_empty": "<blockquote><b>𝖭ᴏ 𝖬ᴏʀᴇ 𝖲ᴏɴɢs ɪɴ ᴛʜᴇ 𝖰ᴜᴇᴜᴇ\nᴛʜᴇ ᴘʟᴀʏʟɪsᴛ ʜᴀs ᴇɴᴅᴇᴅ — ʜɪᴛ ᴀᴜᴛᴏᴘʟᴀʏ ᴛᴏ ᴋᴇᴇᴘ ᴛʜᴇ ᴍᴜsɪᴄ ɢᴏɪɴɢ.</b></blockquote>",
     "not_playing": "The bot isn't streaming in the video chat.",
     "pinging": "Pinging… please wait…",
     "ping_pong": "<u><b>Pong!</b></u>\n\n<b>Latency:</b> <code>{0}ms</code>\n\n<b>Uptime:</b> {1}\n<b>CPU:</b> <code>{2}%</code>\n<b>RAM:</b> <code>{3}%</code>\n<b>Disk:</b> <code>{4}%</code>\n<b>PyTgCalls Latency:</b> <code>{5}ms</code>",
