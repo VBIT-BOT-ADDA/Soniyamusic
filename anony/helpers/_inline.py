@@ -83,59 +83,49 @@ class Inline:
         status: str = None,
         timer: str = None,
         remove: bool = False,
+        lang: dict = None,
+        **kwargs,
     ) -> types.InlineKeyboardMarkup:
-        keyboard = []
-        if status:
-            keyboard.append(
-                [
-                    self.ikb(
-                        text=status,
-                        callback_data=f"controls status {chat_id}",
-                        style=enums.ButtonStyle.DANGER,
-                    )
-                ]
-            )
-        elif timer:
-            keyboard.append(
-                [
-                    self.ikb(
-                        text=timer,
-                        callback_data=f"controls status {chat_id}",
-                        style=enums.ButtonStyle.DANGER,
-                    )
-                ]
-            )
+        if remove:
+            if status:
+                return self.ikm(
+                    [
+                        [
+                            self.ikb(
+                                text=status,
+                                callback_data=f"controls status {chat_id}",
+                                style=enums.ButtonStyle.DANGER,
+                            )
+                        ]
+                    ]
+                )
+            return self.ikm([])
 
-        if not remove:
-            keyboard.append(
-                [
-                    self.ikb(
-                        text="▷",
-                        callback_data=f"controls resume {chat_id}",
-                        style=enums.ButtonStyle.DANGER,
-                    ),
-                    self.ikb(
-                        text="II",
-                        callback_data=f"controls pause {chat_id}",
-                        style=enums.ButtonStyle.DANGER,
-                    ),
-                    self.ikb(
-                        text="⥁",
-                        callback_data=f"controls replay {chat_id}",
-                        style=enums.ButtonStyle.DANGER,
-                    ),
-                    self.ikb(
-                        text="‣‣I",
-                        callback_data=f"controls skip {chat_id}",
-                        style=enums.ButtonStyle.DANGER,
-                    ),
-                    self.ikb(
-                        text="▢",
-                        callback_data=f"controls stop {chat_id}",
-                        style=enums.ButtonStyle.DANGER,
-                    ),
-                ]
-            )
+        add_text = "Add me baby"
+        if isinstance(lang, dict) and "add_me" in lang:
+            add_text = lang["add_me"]
+
+        keyboard = [
+            [
+                self.ikb(
+                    text=add_text,
+                    url=f"https://t.me/{app.username}?startgroup=true",
+                    style=enums.ButtonStyle.SUCCESS,
+                )
+            ],
+            [
+                self.ikb(
+                    text="II",
+                    callback_data=f"controls pause {chat_id}",
+                    style=enums.ButtonStyle.DANGER,
+                ),
+                self.ikb(
+                    text="▷",
+                    callback_data=f"controls resume {chat_id}",
+                    style=enums.ButtonStyle.DANGER,
+                ),
+            ],
+        ]
         return self.ikm(keyboard)
 
     def autoplay_markup(self, chat_id: int, status: bool) -> types.InlineKeyboardMarkup:

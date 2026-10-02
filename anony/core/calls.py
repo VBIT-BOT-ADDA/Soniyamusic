@@ -191,7 +191,7 @@ class TgCall(PyTgCalls):
                     f"❍ ᴅᴜʀᴧᴛɪση : {media.duration} ϻɪηᴜᴛєs\n"
                     f"❍ ʙʏ : {media.user}</blockquote>"
                 )
-                keyboard = buttons.controls(chat_id)
+                keyboard = buttons.controls(chat_id, lang=_lang)
                 try:
                     if _thumb:
                         await message.edit_media(

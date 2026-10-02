@@ -82,20 +82,16 @@ async def update_timer(length=10, sleep=12):
                 if remaining < 10:
                     remove = True
                 else:
-                    if config.THUMB_GEN:
-                        timer = f"{time.strftime('%M:%S', time.gmtime(played))} | {timer} | -{time.strftime('%M:%S', time.gmtime(remaining))}"
-                    else:
-                        timer = None
                     remove = False
 
-                if not timer and not remove:
+                if not remove:
                     continue
 
                 await app.edit_message_reply_markup(
                     chat_id=chat_id,
                     message_id=message_id,
                     reply_markup=buttons.controls(
-                        chat_id=chat_id, timer=timer, remove=remove
+                        chat_id=chat_id, remove=remove
                     ),
                 )
             except asyncio.CancelledError:
