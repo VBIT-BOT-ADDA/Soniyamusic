@@ -44,9 +44,9 @@ class Config:
             "PING_IMG",
             "assets/ping.jpg"
             if os.path.exists("assets/ping.jpg")
-            else "https://files.catbox.moe/haagg2.png",
+            else "https://files.catbox.moe/4fkrru.jpg",
         )
-        self.START_IMG = getenv("START_IMG", "https://files.catbox.moe/zvziwk.jpg")
+        self.START_IMG = getenv("START_IMG", "https://files.catbox.moe/4fkrru.jpg")
         self.ARC_API_URL = getenv("ARC_API_URL", "https://api.arcmusic.fun")
         self.ARC_API_KEY = getenv("ARC_API_KEY", "ARC5c354b8ef8b2b1ef5d9e8b")
 
